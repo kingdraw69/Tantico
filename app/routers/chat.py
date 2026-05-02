@@ -13,4 +13,8 @@ async def send_chat_message(
     payload: ChatMessageCreate,
     user: User = Depends(get_current_user),
 ):
+    """
+    Recibe un mensaje del estudiante, lo procesa con Ana y devuelve:
+    emoción, riesgo, respuesta, acción sugerida y estado visual del avatar.
+    """
     return await process_chat_message(payload)

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hablemos Tantico | Ana</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <section class="avatar-panel">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <div>
+          <h1>Hablemos Tantico</h1>
+          <p>Ana, tu acompañante de autocuidado</p>
+        </div>
+      </div>
+
+      <div class="ana-card">
+        <div id="anaAvatar" class="ana-avatar idle" aria-label="Avatar Ana">
+            <div class="ana-character">
+                <div class="ana-hair-back"></div>
+
+                <div class="ana-head">
+                <div class="ana-hair-front"></div>
+                <div class="ana-hair-curl"></div>
+
+                <div class="ana-ear ana-ear-left">
+                    <div class="ana-earring"></div>
+                </div>
+
+                <div class="ana-ear ana-ear-right">
+                    <div class="ana-earring"></div>
+                </div>
+
+                <div class="ana-brow ana-brow-left"></div>
+                <div class="ana-brow ana-brow-right"></div>
+
+                <div class="ana-eye ana-eye-left">
+                    <div class="ana-pupil"></div>
+                </div>
+
+                <div class="ana-eye ana-eye-right">
+                    <div class="ana-pupil"></div>
+                </div>
+
+                <div class="ana-nose"></div>
+                <div class="ana-mouth"></div>
+
+                <div class="ana-cheek ana-cheek-left"></div>
+                <div class="ana-cheek ana-cheek-right"></div>
+                </div>
+
+                <div class="ana-neck"></div>
+
+                <div class="ana-body">
+                <div class="ana-hoodie-left"></div>
+                <div class="ana-hoodie-right"></div>
+                <div class="ana-shirt"></div>
+                <div class="ana-necklace"></div>
+                <div class="ana-pin">♥</div>
+
+                <div class="ana-arm ana-arm-left">
+                    <div class="ana-book"></div>
+                </div>
+
+                <div class="ana-arm ana-arm-right"></div>
+                </div>
+
+                <div class="ana-bag"></div>
+
+                <div class="ana-legs">
+                <div class="ana-leg ana-leg-left"></div>
+                <div class="ana-leg ana-leg-right"></div>
+                </div>
+
+                <div class="ana-shoes">
+                <div class="ana-shoe ana-shoe-left"></div>
+                <div class="ana-shoe ana-shoe-right"></div>
+                </div>
+
+                <div class="ana-shadow"></div>
+            </div>
+
+            <div class="state-bubble" id="stateBubble">Lista para escucharte</div>
+            </div>
+      </div>
+
+      <div class="status-box">
+        <p><strong>Estado:</strong> <span id="avatarState">Neutral</span></p>
+        <p><strong>Emoción:</strong> <span id="emotionLabel">Sin detectar</span></p>
+        <p><strong>Riesgo:</strong> <span id="riskLabel">Sin evaluar</span></p>
+      </div>
+
+      <button id="voiceToggle" class="voice-button" type="button">
+        🔊 Voz activada
+      </button>
+
+      <p class="ethical-note">
+        Ana ofrece apoyo de autocuidado. No reemplaza atención psicológica profesional.
+      </p>
+    </section>
+
+    <section class="chat-panel">
+      <div class="chat-header">
+        <div>
+          <h2>Chat con Ana</h2>
+          <p>Escribe cómo te sientes. Ana responderá con texto y voz.</p>
+        </div>
+        <a href="/docs" target="_blank" rel="noopener">Swagger</a>
+      </div>
+
+      <div id="messages" class="messages">
+        <div class="message bot">
+          <strong>Ana</strong>
+          <p>Hola, soy Ana. Estoy aquí para escucharte un tantico. ¿Cómo te sientes hoy?</p>
+        </div>
+      </div>
+
+      <form id="chatForm" class="chat-form">
+        <textarea
+          id="messageInput"
+          placeholder="Ejemplo: Estoy muy nervioso por el parcial..."
+          rows="3"
+          required
+        ></textarea>
+
+        <div class="form-actions">
+          <label class="history-check">
+            <input id="allowHistory" type="checkbox" />
+            Permitir guardar historial
+          </label>
+
+          <button type="submit" id="sendButton">
+            Enviar
+          </button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

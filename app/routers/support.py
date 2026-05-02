@@ -1,67 +1,113 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.entities import User
+from app.models.entities import Exercise, User
 from app.schemas.support import (
-    MotivationRequest,
-    MotivationResponse,
-    CBTGuideRequest,
-    CBTGuideResponse,
     SupportRecommendationRequest,
     SupportRecommendationResponse,
+    SupportToolResponse,
 )
 from app.services.support import (
-    get_motivational_message,
-    recommend_support_action,
-    generate_cbt_guide,
+    get_motivational_phrase,
+    get_tcc_prompt,
+    select_support_tool,
 )
 
-router = APIRouter(prefix="/support", tags=["support"])
+router = APIRouter(prefix='/support', tags=['support'])
 
 
-@router.post("/motivation", response_model=MotivationResponse)
-async def motivation(
-    payload: MotivationRequest,
+@router.get('/tools', response_model=list[SupportToolResponse])
+async def list_support_tools(
+    db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    message = get_motivational_message(payload.emotion, payload.context)
+    result = await db.execute(
+        select(Exercise)
+        .where(Exercise.is_active.is_(True))
+        .order_by(Exercise.category, Exercise.title)
+    )
 
-    return MotivationResponse(
-        emotion=payload.emotion,
-        message=message,
+    exercises = result.scalars().all()
+
+    return [
+        SupportToolResponse(
+            slug=item.slug,
+            title=item.title,
+            category=item.category,
+            duration_minutes=item.duration_minutes,
+            description=item.description,
+            steps=item.steps,
+        )
+        for item in exercises
+    ]
+
+
+@router.get('/tools/{slug}', response_model=SupportToolResponse)
+async def get_support_tool(
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Exercise).where(
+            Exercise.slug == slug,
+            Exercise.is_active.is_(True),
+        )
+    )
+
+    exercise = result.scalar_one_or_none()
+
+    if not exercise:
+        raise HTTPException(status_code=404, detail='Herramienta no encontrada')
+
+    return SupportToolResponse(
+        slug=exercise.slug,
+        title=exercise.title,
+        category=exercise.category,
+        duration_minutes=exercise.duration_minutes,
+        description=exercise.description,
+        steps=exercise.steps,
     )
 
 
-@router.post("/recommendation", response_model=SupportRecommendationResponse)
-async def support_recommendation(
+@router.post('/recommendation', response_model=SupportRecommendationResponse)
+async def recommend_support_tool(
     payload: SupportRecommendationRequest,
+    db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    slug, reason = recommend_support_action(
-        emotion=payload.emotion,
-        stress_level=payload.stress_level,
-        minutes_available=payload.minutes_available,
+    result = await db.execute(
+        select(Exercise).where(Exercise.is_active.is_(True))
     )
+
+    exercises = list(result.scalars().all())
+
+    selected_tool = select_support_tool(
+        emotion=payload.emotion,
+        intensity=payload.intensity,
+        minutes_available=payload.minutes_available,
+        exercises=exercises,
+    )
+
+    if not selected_tool:
+        raise HTTPException(
+            status_code=404,
+            detail='No hay herramientas disponibles para esta emoción',
+        )
 
     return SupportRecommendationResponse(
         emotion=payload.emotion,
-        recommended_exercise_slug=slug,
-        reason=reason,
+        recommended_tool=SupportToolResponse(
+            slug=selected_tool.slug,
+            title=selected_tool.title,
+            category=selected_tool.category,
+            duration_minutes=selected_tool.duration_minutes,
+            description=selected_tool.description,
+            steps=selected_tool.steps,
+        ),
+        motivational_phrase=get_motivational_phrase(payload.emotion),
+        tcc_prompt=get_tcc_prompt(payload.emotion),
     )
-
-
-@router.post("/cbt-guide", response_model=CBTGuideResponse)
-async def cbt_guide(
-    payload: CBTGuideRequest,
-    user: User = Depends(get_current_user),
-):
-    result = generate_cbt_guide(
-        situation=payload.situation,
-        automatic_thought=payload.automatic_thought,
-        emotion=payload.emotion,
-        intensity=payload.intensity,
-    )
-
-    return CBTGuideResponse(**result)

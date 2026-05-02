@@ -1,39 +1,32 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
-class MotivationRequest(BaseModel):
-    emotion: str = Field(..., examples=["ansiedad", "estres_academico", "tristeza"])
-    context: str | None = Field(default=None, examples=["parcial", "entrega", "exposicion"])
-
-
-class MotivationResponse(BaseModel):
-    emotion: str
-    message: str
-
-
-class CBTGuideRequest(BaseModel):
-    situation: str
-    automatic_thought: str
-    emotion: str
-    intensity: int = Field(..., ge=1, le=5)
-
-
-class CBTGuideResponse(BaseModel):
-    situation: str
-    automatic_thought: str
-    emotion: str
-    intensity: int
-    balanced_thought: str
-    suggested_action: str
-
-
 class SupportRecommendationRequest(BaseModel):
-    emotion: str
-    stress_level: int = Field(..., ge=1, le=5)
-    minutes_available: int = Field(default=3, ge=1, le=10)
+    emotion: Literal[
+        'ansiedad',
+        'estres_academico',
+        'tristeza',
+        'confusion',
+        'calma',
+        'crisis'
+    ]
+    intensity: int = Field(default=3, ge=1, le=5)
+    minutes_available: int = Field(default=3, ge=1, le=15)
+
+
+class SupportToolResponse(BaseModel):
+    slug: str
+    title: str
+    category: str
+    duration_minutes: int
+    description: str
+    steps: str
 
 
 class SupportRecommendationResponse(BaseModel):
     emotion: str
-    recommended_exercise_slug: str
-    reason: str
+    recommended_tool: SupportToolResponse
+    motivational_phrase: str
+    tcc_prompt: str | None = None

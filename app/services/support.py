@@ -1,98 +1,101 @@
-def get_motivational_message(emotion: str, context: str | None = None) -> str:
-    emotion = emotion.lower()
-
-    if emotion in {"ansiedad", "nervios"}:
-        return (
-            "Respira un momento. Sentirte nervioso no significa que no puedas hacerlo; "
-            "significa que esto te importa. Vamos paso a paso."
-        )
-
-    if emotion in {"estres", "estres_academico"}:
-        return (
-            "Tienes muchas cosas encima, pero no tienes que resolver todo al mismo tiempo. "
-            "Elige una sola tarea pequeña y empieza por ahí."
-        )
-
-    if emotion == "tristeza":
-        return (
-            "Lamento que te estés sintiendo así. No tienes que exigirte estar bien de inmediato. "
-            "Haz algo pequeño por ti ahora: respirar, tomar agua o escribir lo que sientes."
-        )
-
-    if emotion == "confusion":
-        return (
-            "No tener claridad en este momento no significa que estés perdido. "
-            "Puedes ordenar tus ideas empezando por una pregunta sencilla: ¿qué necesito primero?"
-        )
-
-    return (
-        "Estoy contigo en este momento. Hagamos una pausa breve y busquemos una acción pequeña "
-        "que puedas realizar ahora."
-    )
+from app.models.entities import Exercise
 
 
-def recommend_support_action(emotion: str, stress_level: int, minutes_available: int) -> tuple[str, str]:
-    emotion = emotion.lower()
+MOTIVATIONAL_PHRASES = {
+    'ansiedad': [
+        'Vamos paso a paso. No necesitas resolver todo ahora, solo regular un poco tu cuerpo.',
+        'Lo que sientes es difícil, pero este momento puede bajar de intensidad con una pausa breve.',
+        'Respira conmigo un momento. Primero calma el cuerpo, luego organizamos la mente.',
+    ],
+    'estres_academico': [
+        'No tienes que hacerlo todo al mismo tiempo. Una tarea pequeña también cuenta como avance.',
+        'Organizar el siguiente paso puede ser más útil que exigirte resolverlo todo hoy.',
+        'Tu esfuerzo vale, incluso cuando el día se siente pesado.',
+    ],
+    'tristeza': [
+        'No tienes que forzarte a estar bien de inmediato. Empezar con algo pequeño también es cuidarte.',
+        'Está bien sentirte así. Hoy puedes darte un trato más amable.',
+        'Un paso suave también es un paso. No estás fallando por necesitar una pausa.',
+    ],
+    'confusion': [
+        'No saber exactamente qué sientes también es válido. Podemos empezar nombrando lo que aparece.',
+        'Vamos con calma. A veces entender la emoción toma unos minutos.',
+        'No necesitas tener todas las respuestas ahora; basta con observar qué está pasando dentro de ti.',
+    ],
+    'calma': [
+        'Qué bueno que estés en un momento más tranquilo. Puedes aprovecharlo para cuidar tu energía.',
+        'Mantener pequeñas pausas también ayuda a prevenir la sobrecarga.',
+        'Este es un buen momento para reforzar hábitos que te ayuden después.',
+    ],
+    'crisis': [
+        'Tu seguridad es lo primero. No tienes que atravesar esto a solas.',
+    ],
+}
 
-    if stress_level >= 4 or emotion in {"ansiedad", "nervios"}:
-        return (
-            "respiracion-4-4-4",
-            "Se recomienda respiración guiada porque hay señales de ansiedad o activación emocional alta."
-        )
 
-    if emotion in {"estres", "estres_academico"}:
-        return (
-            "pausa-breve-estudio",
-            "Se recomienda una pausa breve porque el malestar está asociado a carga académica."
-        )
-
-    if emotion == "tristeza":
-        return (
-            "reestructuracion-pensamientos",
-            "Se recomienda una guía TCC breve para revisar pensamientos negativos."
-        )
-
-    if minutes_available <= 2:
-        return (
-            "respiracion-4-4-4",
-            "Se recomienda un ejercicio corto porque el usuario tiene poco tiempo disponible."
-        )
-
-    return (
-        "anclaje-5-sentidos",
-        "Se recomienda grounding para volver al presente y reducir saturación mental."
-    )
+TCC_PROMPTS = {
+    'ansiedad': (
+        'Guía TCC breve: escribe el pensamiento que te preocupa, por ejemplo: '
+        '"me va a ir mal". Luego pregúntate: ¿qué evidencia tengo?, '
+        '¿qué otra explicación más equilibrada podría existir?'
+    ),
+    'estres_academico': (
+        'Guía TCC breve: identifica el pensamiento de presión, por ejemplo: '
+        '"no voy a alcanzar". Luego conviértelo en una acción concreta: '
+        '"durante 15 minutos haré solo el primer punto".'
+    ),
+    'tristeza': (
+        'Guía TCC breve: escribe qué te estás diciendo a ti mismo en este momento. '
+        'Después intenta responderte como le responderías a un amigo que quieres cuidar.'
+    ),
+    'confusion': (
+        'Guía TCC breve: intenta completar esta frase: '
+        '"ahora mismo siento ___ porque estoy pensando ___".'
+    ),
+    'calma': (
+        'Guía TCC breve: identifica qué acción te ayudó a estar mejor y cómo podrías repetirla esta semana.'
+    ),
+}
 
 
-def generate_cbt_guide(
-    situation: str,
-    automatic_thought: str,
+def get_motivational_phrase(emotion: str) -> str:
+    phrases = MOTIVATIONAL_PHRASES.get(emotion, MOTIVATIONAL_PHRASES['confusion'])
+    return phrases[0]
+
+
+def get_tcc_prompt(emotion: str) -> str | None:
+    if emotion == 'crisis':
+        return None
+
+    return TCC_PROMPTS.get(emotion, TCC_PROMPTS['confusion'])
+
+
+def select_support_tool(
     emotion: str,
     intensity: int,
-) -> dict:
-    thought_lower = automatic_thought.lower()
+    minutes_available: int,
+    exercises: list[Exercise],
+) -> Exercise | None:
+    available_by_slug = {exercise.slug: exercise for exercise in exercises}
 
-    if "no puedo" in thought_lower or "voy a perder" in thought_lower:
-        balanced = (
-            "Estoy teniendo un pensamiento muy duro conmigo mismo. "
-            "Aunque la situación sea difícil, puedo prepararme por partes y avanzar con una acción concreta."
-        )
-    elif "todo" in thought_lower or "nada" in thought_lower:
-        balanced = (
-            "Quizás estoy viendo la situación en extremos. "
-            "Puedo buscar una forma más equilibrada de entender lo que está pasando."
-        )
-    else:
-        balanced = (
-            "Este pensamiento refleja cómo me siento ahora, pero no necesariamente define toda la realidad. "
-            "Puedo observarlo con calma y elegir una respuesta más útil."
-        )
+    if emotion == 'crisis':
+        return available_by_slug.get('contacto-bienestar')
 
-    return {
-        "situation": situation,
-        "automatic_thought": automatic_thought,
-        "emotion": emotion,
-        "intensity": intensity,
-        "balanced_thought": balanced,
-        "suggested_action": "Elige una acción pequeña para los próximos 5 minutos: respirar, organizar una tarea o pedir apoyo.",
-    }
+    if emotion == 'ansiedad' and intensity >= 4:
+        if minutes_available <= 2:
+            return available_by_slug.get('respiracion-4-4-4')
+        return available_by_slug.get('respiracion-4-7-8') or available_by_slug.get('respiracion-4-4-4')
+
+    if emotion == 'estres_academico':
+        return available_by_slug.get('pausa-breve-estudio')
+
+    if emotion == 'tristeza':
+        return available_by_slug.get('reestructuracion-pensamientos')
+
+    if emotion == 'confusion':
+        return available_by_slug.get('anclaje-5-sentidos')
+
+    if emotion == 'calma':
+        return available_by_slug.get('pausa-consciente')
+
+    return available_by_slug.get('anclaje-5-sentidos')

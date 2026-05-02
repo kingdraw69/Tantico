@@ -4,19 +4,23 @@ from pydantic import BaseModel, Field
 
 
 class ChatContext(BaseModel):
-    source: str = 'chat'
-    minutes_available: int = Field(default=3, ge=1, le=15)
+    source: str | None = None
+    minutes_available: int = 5
     allow_history: bool = False
+    conversation_history: list[dict] = []
 
 
 class ChatMessageCreate(BaseModel):
-    message: str = Field(..., min_length=2, max_length=1000)
-    context: ChatContext = Field(default_factory=ChatContext)
+    message: str = Field(..., min_length=1)
+    context: ChatContext = ChatContext()
 
 
 class ChatMessageResponse(BaseModel):
     emotion: str
-    risk_level: Literal['bajo', 'medio', 'alto']
+    risk_level: str
     reply: str
     suggested_action: str | None = None
     save_history: bool = False
+    avatar_state: str = "speaking"
+    intent: str = "normal_conversation"
+    voice_text: str | None = None
