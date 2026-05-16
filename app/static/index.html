@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hablemos Tantico | Ana</title>
-  <link rel="stylesheet" href="/static/styles.css?v=6" />
+  <link rel="stylesheet" href="/static/styles.css?v=13" />
 </head>
 <body>
   <main class="app-shell">
@@ -87,7 +87,127 @@
         </div>
       </form>
     </section>
+    <section class="mvp-panel">
+      <div class="mvp-card checkin-card">
+        <div class="mvp-card-header">
+          <h3>Check-in rápido</h3>
+          <p>Registra cómo estás en menos de un minuto.</p>
+        </div>
 
+        <form id="checkinForm">
+          <p class="mini-label">¿Cómo te sientes ahora?</p>
+
+          <div class="mood-options">
+            <button type="button" data-mood="bien">Bien</button>
+            <button type="button" data-mood="regular">Regular</button>
+            <button type="button" data-mood="ansiedad">Ansioso</button>
+            <button type="button" data-mood="tristeza">Triste</button>
+          </div>
+
+          <label class="mini-label" for="stressLevel">
+            Nivel de estrés: <span id="stressValue">3</span>/5
+          </label>
+
+          <input
+            id="stressLevel"
+            type="range"
+            min="1"
+            max="5"
+            value="3"
+          />
+
+          <textarea
+            id="checkinNote"
+            rows="2"
+            placeholder="Nota opcional: ¿qué está pasando?"
+          ></textarea>
+
+          <button type="submit" class="mvp-main-button">
+            Guardar check-in
+          </button>
+        </form>
+      </div>
+
+      <div class="mvp-card pomodoro-card">
+        <div class="mvp-card-header">
+          <h3>Estudio y pausa</h3>
+          <p>Pomodoro simple para organizarte sin saturarte.</p>
+        </div>
+
+        <div class="pomodoro-timer" id="pomodoroTimer">
+          25:00
+        </div>
+
+        <p class="pomodoro-mode" id="pomodoroMode">
+          Modo estudio
+        </p>
+
+        <div class="pomodoro-config">
+          <label>
+            Estudio
+            <input id="focusMinutes" type="number" min="1" max="90" value="25" />
+          </label>
+
+          <label>
+            Pausa
+            <input id="breakMinutes" type="number" min="1" max="30" value="5" />
+          </label>
+        </div>
+
+        <div class="pomodoro-actions">
+          <button type="button" id="startPomodoroBtn">Iniciar</button>
+          <button type="button" id="pausePomodoroBtn">Pausar</button>
+          <button type="button" id="resetPomodoroBtn">Reiniciar</button>
+        </div>
+      </div>
+
+      <div class="mvp-card progress-card">
+        <div class="mvp-card-header">
+          <h3>Progreso semanal</h3>
+          <p>Resumen local de uso y autocuidado.</p>
+        </div>
+
+        <div class="progress-grid">
+          <div>
+            <strong id="checkinsCount">0</strong>
+            <span>check-ins</span>
+          </div>
+
+          <div>
+            <strong id="pomodorosCount">0</strong>
+            <span>sesiones</span>
+          </div>
+
+          <div>
+            <strong id="exercisesCount">0</strong>
+            <span>ejercicios</span>
+          </div>
+        </div>
+
+        <div class="progress-bar-box">
+          <span>Estrés promedio</span>
+          <div class="progress-bar">
+            <div id="stressProgressBar"></div>
+          </div>
+          <small id="stressAverageLabel">Sin datos todavía</small>
+        </div>
+      </div>
+
+      <div class="mvp-card privacy-card">
+        <div class="mvp-card-header">
+          <h3>Privacidad</h3>
+          <p>Control local del historial y datos guardados.</p>
+        </div>
+
+        <button type="button" id="clearChatBtn" class="privacy-button">
+          Borrar conversación actual
+        </button>
+
+        <button type="button" id="clearLocalDataBtn" class="privacy-button danger">
+          Borrar datos locales
+        </button>
+      </div>
+    </section>
     <section
       id="guidedExercisePanel"
       class="guided-exercise-panel"
@@ -95,6 +215,6 @@
     ></section>
   </main>
 
-  <script src="/static/app.js?v=6"></script>
+  <script src="/static/app.js?v=13"></script>
 </body>
 </html>

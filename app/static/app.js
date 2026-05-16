@@ -14,6 +14,35 @@ const allowHistory = document.getElementById("allowHistory");
 const panicButton = document.getElementById("panicButton");
 const guidedExercisePanel = document.getElementById("guidedExercisePanel");
 
+const checkinForm = document.getElementById("checkinForm");
+const moodButtons = document.querySelectorAll("[data-mood]");
+const stressLevel = document.getElementById("stressLevel");
+const stressValue = document.getElementById("stressValue");
+const checkinNote = document.getElementById("checkinNote");
+
+const startPomodoroBtn = document.getElementById("startPomodoroBtn");
+const pausePomodoroBtn = document.getElementById("pausePomodoroBtn");
+const resetPomodoroBtn = document.getElementById("resetPomodoroBtn");
+const pomodoroTimer = document.getElementById("pomodoroTimer");
+const pomodoroMode = document.getElementById("pomodoroMode");
+const focusMinutes = document.getElementById("focusMinutes");
+const breakMinutes = document.getElementById("breakMinutes");
+
+const checkinsCount = document.getElementById("checkinsCount");
+const pomodorosCount = document.getElementById("pomodorosCount");
+const exercisesCount = document.getElementById("exercisesCount");
+const stressProgressBar = document.getElementById("stressProgressBar");
+const stressAverageLabel = document.getElementById("stressAverageLabel");
+
+const clearChatBtn = document.getElementById("clearChatBtn");
+const clearLocalDataBtn = document.getElementById("clearLocalDataBtn");
+
+let selectedMood = "regular";
+let pomodoroInterval = null;
+let pomodoroRemainingSeconds = 25 * 60;
+let pomodoroCurrentMode = "focus";
+let pomodoroRunning = false;
+
 let voiceEnabled = true;
 let conversationHistory = [];
 let activeExerciseSession = null;
@@ -223,19 +252,20 @@ if (voiceToggle) {
 if (input) {
   input.addEventListener("focus", () => setAvatarState("listening"));
   input.addEventListener("input", () => setAvatarState("listening"));
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+
+      if (form.requestSubmit) {
+        form.requestSubmit();
+      } else {
+        sendButton.click();
+      }
+    }
+  });
 }
 
-input.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey) {
-    event.preventDefault();
 
-    if (form.requestSubmit) {
-      form.requestSubmit();
-    } else {
-      sendButton.click();
-    }
-  }
-});
 
 if (form) {
   form.addEventListener("submit", async (event) => {
@@ -358,7 +388,7 @@ async function activatePanicButton() {
     });
 
     if (response.status === 404) {
-      throw new Error("El endpoint /api/v1/support/panic no está registrado en el backend.");
+      throw new Error("El endpoint /api/v1/support/panic no está registrado.");
     }
 
     if (response.status === 401 || response.status === 403) {
@@ -392,6 +422,7 @@ async function activatePanicButton() {
     } else {
       renderPanicExercises([
         {
+          slug: "respiracion-4-4-4",
           title: "Respiración 4-4-4",
           category: "respiración",
           duration_minutes: 2,
@@ -404,6 +435,7 @@ async function activatePanicButton() {
           ]
         },
         {
+          slug: "reestructuracion-pensamientos",
           title: "Guía TCC breve",
           category: "TCC",
           duration_minutes: 3,
@@ -454,6 +486,7 @@ async function loadGuidedExercise(slug) {
     }
 
     const exercise = await response.json();
+    trackExerciseStarted(exercise);
     renderGuidedExercise(exercise);
   } catch (error) {
     console.error("Error cargando ejercicio guiado:", error);
@@ -1153,13 +1186,24 @@ function renderPanicExercises(exercises) {
 
   if (!panel) return;
 
+  let safeExercises = Array.isArray(exercises) ? exercises : [];
+
+  if (safeExercises.length === 0) {
+    safeExercises = [
+      LOCAL_SUPPORT_EXERCISES["conexion-tierra-54321-contactos"],
+      LOCAL_SUPPORT_EXERCISES["respiracion-4-4-4"],
+      LOCAL_SUPPORT_EXERCISES["frase-motivacional"],
+      LOCAL_SUPPORT_EXERCISES["reestructuracion-pensamientos"]
+    ];
+  }
+
   panel.innerHTML = `
     <div class="exercise-card panic-card">
       <h3>Apoyo inmediato</h3>
       <p>Elige una guía para empezar ahora mismo:</p>
 
       <div class="panic-exercise-list">
-        ${exercises.map((exercise, index) => `
+        ${safeExercises.map((exercise, index) => `
           <button class="exercise-option" type="button" data-index="${index}">
             ${escapeHtml(exercise.title || "Ejercicio")} · ${escapeHtml(exercise.duration_minutes || "1")} min
           </button>
@@ -1176,13 +1220,514 @@ function renderPanicExercises(exercises) {
   buttons.forEach(button => {
     button.addEventListener("click", () => {
       const index = Number(button.dataset.index);
-      renderGuidedExercise(exercises[index]);
+      const exercise = safeExercises[index];
+
+      trackExerciseStarted(exercise);
+      renderGuidedExercise(exercise);
     });
   });
 }
 
+if (stressLevel && stressValue) {
+  stressLevel.addEventListener("input", () => {
+    stressValue.textContent = stressLevel.value;
+  });
+}
+
+if (moodButtons && moodButtons.length > 0) {
+  moodButtons.forEach(button => {
+    button.addEventListener("click", () => {
+      selectedMood = button.dataset.mood || "regular";
+
+      moodButtons.forEach(item => item.classList.remove("selected"));
+      button.classList.add("selected");
+
+      setAvatarState("listening");
+    });
+  });
+}
+
+if (checkinForm) {
+  checkinForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const stress = Number(stressLevel.value || 3);
+    const mood = selectedMood || "regular";
+    const note = checkinNote.value.trim();
+
+    const checkin = {
+      id: generateLocalId(),
+      mood,
+      stress,
+      note,
+      created_at: new Date().toISOString()
+    };
+
+    addLocalItem("tantico_checkins", checkin);
+
+    emotionLabel.textContent = moodToEmotionLabel(mood);
+    riskLabel.textContent = stress >= 5 ? "medio" : "bajo";
+
+    addMessage(
+      "bot",
+      "Ana",
+      `Gracias por hacer el check-in. Registré que te sientes ${moodToEmotionLabel(mood).toLowerCase()} con estrés ${stress}/5.`
+    );
+
+    const suggestedExercise = suggestExerciseFromCheckin(mood, stress);
+
+    if (suggestedExercise) {
+      addMessage(
+        "system",
+        "Sugerencia",
+        "Te preparé un ejercicio breve para acompañarte."
+      );
+
+      await loadGuidedExercise(suggestedExercise);
+      setAvatarState("supportive");
+    } else {
+      setAvatarState("idle");
+    }
+
+    checkinNote.value = "";
+    updateProgressSummary();
+  });
+}
+
+function formatPomodoroTime(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
+
+  return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`;
+}
+
+function updatePomodoroDisplay() {
+  if (pomodoroTimer) {
+    pomodoroTimer.textContent = formatPomodoroTime(pomodoroRemainingSeconds);
+  }
+
+  if (pomodoroMode) {
+    pomodoroMode.textContent =
+      pomodoroCurrentMode === "focus" ? "Modo estudio" : "Modo pausa";
+  }
+}
+
+function resetPomodoro() {
+  clearInterval(pomodoroInterval);
+  pomodoroInterval = null;
+  pomodoroRunning = false;
+  pomodoroCurrentMode = "focus";
+  pomodoroRemainingSeconds = Number(focusMinutes.value || 25) * 60;
+
+  if (startPomodoroBtn) {
+    startPomodoroBtn.textContent = "Iniciar";
+  }
+
+  updatePomodoroDisplay();
+  setAvatarState("idle");
+}
+
+function completePomodoroSegment() {
+  clearInterval(pomodoroInterval);
+  pomodoroInterval = null;
+  pomodoroRunning = false;
+
+  if (pomodoroCurrentMode === "focus") {
+    addLocalItem("tantico_pomodoros", {
+      id: generateLocalId(),
+      focus_minutes: Number(focusMinutes.value || 25),
+      created_at: new Date().toISOString()
+    });
+
+    addMessage(
+      "bot",
+      "Ana",
+      "Muy bien. Completaste una sesión de estudio. Ahora toma una pausa breve."
+    );
+
+    pomodoroCurrentMode = "break";
+    pomodoroRemainingSeconds = Number(breakMinutes.value || 5) * 60;
+    setAvatarState("supportive");
+  } else {
+    addMessage(
+      "bot",
+      "Ana",
+      "Terminó la pausa. Puedes volver con calma a tu siguiente bloque."
+    );
+
+    pomodoroCurrentMode = "focus";
+    pomodoroRemainingSeconds = Number(focusMinutes.value || 25) * 60;
+    setAvatarState("idle");
+  }
+
+  if (startPomodoroBtn) {
+    startPomodoroBtn.textContent = "Iniciar";
+  }
+
+  updatePomodoroDisplay();
+  updateProgressSummary();
+}
+
+function startPomodoro() {
+  if (pomodoroRunning) return;
+
+  pomodoroRunning = true;
+
+  if (startPomodoroBtn) {
+    startPomodoroBtn.textContent = "En curso";
+  }
+
+  setAvatarState("thinking");
+
+  pomodoroInterval = setInterval(() => {
+    pomodoroRemainingSeconds -= 1;
+    updatePomodoroDisplay();
+
+    if (pomodoroRemainingSeconds <= 0) {
+      completePomodoroSegment();
+    }
+  }, 1000);
+}
+
+function pausePomodoro() {
+  clearInterval(pomodoroInterval);
+  pomodoroInterval = null;
+  pomodoroRunning = false;
+
+  if (startPomodoroBtn) {
+    startPomodoroBtn.textContent = "Continuar";
+  }
+
+  setAvatarState("idle");
+}
+
+if (startPomodoroBtn) {
+  startPomodoroBtn.addEventListener("click", startPomodoro);
+}
+
+if (pausePomodoroBtn) {
+  pausePomodoroBtn.addEventListener("click", pausePomodoro);
+}
+
+if (resetPomodoroBtn) {
+  resetPomodoroBtn.addEventListener("click", resetPomodoro);
+}
+
+if (focusMinutes) {
+  focusMinutes.addEventListener("change", resetPomodoro);
+}
+
+if (breakMinutes) {
+  breakMinutes.addEventListener("change", resetPomodoro);
+}
+
+resetPomodoro();
+
+if (clearChatBtn) {
+  clearChatBtn.addEventListener("click", () => {
+    const confirmDelete = confirm("¿Quieres borrar la conversación visible actual?");
+
+    if (!confirmDelete) return;
+
+    conversationHistory = [];
+
+    messages.innerHTML = `
+      <div class="message bot">
+        <strong>Ana</strong>
+        <p>Hola, soy Ana. Estoy aquí para escucharte un tantico. ¿Cómo te sientes hoy?</p>
+      </div>
+    `;
+
+    addMessage("system", "Privacidad", "La conversación visible fue borrada.");
+    setAvatarState("idle");
+  });
+}
+
+if (clearLocalDataBtn) {
+  clearLocalDataBtn.addEventListener("click", () => {
+    const confirmDelete = confirm(
+      "Esto borrará check-ins, sesiones Pomodoro, ejercicios registrados y sesión invitada local. ¿Deseas continuar?"
+    );
+
+    if (!confirmDelete) return;
+
+    localStorage.removeItem("tantico_checkins");
+    localStorage.removeItem("tantico_pomodoros");
+    localStorage.removeItem("tantico_exercises_started");
+    localStorage.removeItem("tantico_token");
+    localStorage.removeItem("tantico_user_id");
+
+    conversationHistory = [];
+
+    if (guidedExercisePanel) {
+      guidedExercisePanel.innerHTML = "";
+      guidedExercisePanel.style.display = "none";
+    }
+
+    updateProgressSummary();
+
+    addMessage(
+      "system",
+      "Privacidad",
+      "Se borraron los datos locales del MVP en este navegador."
+    );
+
+    setAvatarState("idle");
+  });
+}
+
 setAvatarState("idle");
+updateProgressSummary();
 
 getGuestToken().catch(() => {
   addMessage("system", "Aviso", "No se pudo iniciar sesión invitada automáticamente.");
 });
+
+/* =====================================================
+   FUNCIONES LOCALES FALTANTES DEL MVP
+===================================================== */
+
+const LOCAL_SUPPORT_EXERCISES = {
+  "respiracion-4-4-4": {
+    slug: "respiracion-4-4-4",
+    title: "Respiración 4-4-4",
+    category: "respiración",
+    duration_minutes: 2,
+    description: "Ejercicio breve para bajar la activación física y volver al presente.",
+    steps: [
+      "Inhala lentamente por la nariz contando hasta 4.",
+      "Mantén el aire contando hasta 4.",
+      "Exhala despacio por la boca contando hasta 4.",
+      "Repite este ciclo tres veces."
+    ],
+    closing_message: "Muy bien. No tienes que resolver todo ahora; vuelve poco a poco al presente."
+  },
+
+  "conexion-tierra-54321-contactos": {
+    slug: "conexion-tierra-54321-contactos",
+    title: "Volver al presente 5-4-3-2-1",
+    category: "crisis",
+    duration_minutes: 3,
+    description: "Ejercicio para momentos de ansiedad intensa o desborde emocional.",
+    steps: [
+      "Nombra 5 cosas que puedes ver.",
+      "Reconoce 4 cosas que puedes tocar.",
+      "Escucha 3 sonidos a tu alrededor.",
+      "Identifica 2 cosas que puedes oler.",
+      "Nota 1 cosa que puedas saborear o siente tu respiración.",
+      "Si estás en peligro inmediato, busca ayuda humana ahora o llama al 123 en Colombia."
+    ],
+    closing_message: "No tienes que pasar por esto a solas. Busca apoyo humano si lo necesitas."
+  },
+
+  "frase-motivacional": {
+    slug: "frase-motivacional",
+    title: "Frase de apoyo",
+    category: "motivación",
+    duration_minutes: 1,
+    description: "Mensaje breve para acompañarte en un momento pesado.",
+    steps: [
+      "No tienes que resolver todo en este momento.",
+      "Puedes ir paso a paso, incluso si hoy el paso es pequeño.",
+      "Sentirte mal no significa que estés fallando.",
+      "Respira. Este momento difícil también puede pasar."
+    ],
+    closing_message: "Vas paso a paso. No estás fallando por sentirte cansado."
+  },
+
+  "reestructuracion-pensamientos": {
+    slug: "reestructuracion-pensamientos",
+    title: "Guía TCC breve",
+    category: "TCC",
+    duration_minutes: 5,
+    description: "Ejercicio inspirado en TCC para revisar pensamientos difíciles.",
+    steps: [
+      "Identifica el pensamiento que más pesa ahora.",
+      "Pregúntate: ¿esto es un hecho o una interpretación?",
+      "Busca una evidencia a favor y una evidencia en contra.",
+      "Escribe una versión más equilibrada del pensamiento.",
+      "Piensa en una acción pequeña que puedas hacer hoy."
+    ],
+    closing_message: "Un pensamiento no siempre es una verdad completa. Puedes mirarlo con más calma."
+  },
+
+  "pausa-breve-estudio": {
+    slug: "pausa-breve-estudio",
+    title: "Pausa breve de estudio",
+    category: "organización",
+    duration_minutes: 3,
+    description: "Guía rápida para ordenar la mente cuando hay muchas tareas.",
+    steps: [
+      "Escribe mentalmente o en una nota qué tienes pendiente.",
+      "Elige solo una tarea pequeña para empezar.",
+      "Define un tiempo corto: 10 o 15 minutos.",
+      "Deja lo demás para después de esa primera acción.",
+      "Empieza por lo más simple, no por lo perfecto."
+    ],
+    closing_message: "No necesitas hacerlo todo al mismo tiempo. Empieza por una cosa."
+  }
+};
+
+function getLocalItems(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalItems(key, items) {
+  localStorage.setItem(key, JSON.stringify(items));
+}
+
+function addLocalItem(key, item) {
+  const items = getLocalItems(key);
+  items.push(item);
+  saveLocalItems(key, items);
+}
+
+function generateLocalId() {
+  if (window.crypto && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+
+  return String(Date.now());
+}
+
+function normalizeExerciseSlug(slug) {
+  const value = String(slug || "").toLowerCase().trim();
+
+  const aliases = {
+    respiracion: "respiracion-4-4-4",
+    respiracion_4_4_4: "respiracion-4-4-4",
+    breathing: "respiracion-4-4-4",
+    grounding: "conexion-tierra-54321-contactos",
+    grounding_54321: "conexion-tierra-54321-contactos",
+    "54321": "conexion-tierra-54321-contactos",
+    tcc: "reestructuracion-pensamientos",
+    "guia-tcc": "reestructuracion-pensamientos",
+    reestructuracion: "reestructuracion-pensamientos",
+    frase: "frase-motivacional",
+    motivacion: "frase-motivacional",
+    "conversacion-normal": "",
+    normal_conversation: "",
+    ninguna: "",
+    none: "",
+    null: ""
+  };
+
+  return aliases[value] ?? value;
+}
+
+function getLocalSupportExercise(slug) {
+  const normalizedSlug = normalizeExerciseSlug(slug);
+
+  if (!normalizedSlug) {
+    return null;
+  }
+
+  return LOCAL_SUPPORT_EXERCISES[normalizedSlug] || null;
+}
+
+function isCurrentWeek(dateString) {
+  const date = new Date(dateString);
+  const now = new Date();
+
+  const firstDay = new Date(now);
+  const day = firstDay.getDay() || 7;
+
+  firstDay.setDate(firstDay.getDate() - day + 1);
+  firstDay.setHours(0, 0, 0, 0);
+
+  const lastDay = new Date(firstDay);
+  lastDay.setDate(firstDay.getDate() + 7);
+
+  return date >= firstDay && date < lastDay;
+}
+
+function moodToEmotionLabel(mood) {
+  const labels = {
+    bien: "Bienestar",
+    regular: "Regular",
+    ansiedad: "Ansiedad",
+    tristeza: "Tristeza"
+  };
+
+  return labels[mood] || "Regular";
+}
+
+function suggestExerciseFromCheckin(mood, stress) {
+  if (stress >= 5) {
+    return "conexion-tierra-54321-contactos";
+  }
+
+  if (stress >= 4 || mood === "ansiedad") {
+    return "respiracion-4-4-4";
+  }
+
+  if (mood === "tristeza") {
+    return "reestructuracion-pensamientos";
+  }
+
+  if (mood === "regular") {
+    return "pausa-breve-estudio";
+  }
+
+  return null;
+}
+
+function updateProgressSummary() {
+  const checkins = getLocalItems("tantico_checkins").filter(item =>
+    isCurrentWeek(item.created_at)
+  );
+
+  const pomodoros = getLocalItems("tantico_pomodoros").filter(item =>
+    isCurrentWeek(item.created_at)
+  );
+
+  const exercises = getLocalItems("tantico_exercises_started").filter(item =>
+    isCurrentWeek(item.created_at)
+  );
+
+  if (checkinsCount) checkinsCount.textContent = checkins.length;
+  if (pomodorosCount) pomodorosCount.textContent = pomodoros.length;
+  if (exercisesCount) exercisesCount.textContent = exercises.length;
+
+  if (checkins.length > 0) {
+    const average =
+      checkins.reduce((sum, item) => sum + Number(item.stress || 0), 0) /
+      checkins.length;
+
+    const percent = Math.min(100, Math.max(0, (average / 5) * 100));
+
+    if (stressProgressBar) {
+      stressProgressBar.style.width = `${percent}%`;
+    }
+
+    if (stressAverageLabel) {
+      stressAverageLabel.textContent = `${average.toFixed(1)} de 5`;
+    }
+  } else {
+    if (stressProgressBar) {
+      stressProgressBar.style.width = "0%";
+    }
+
+    if (stressAverageLabel) {
+      stressAverageLabel.textContent = "Sin datos todavía";
+    }
+  }
+}
+
+function trackExerciseStarted(exercise) {
+  if (!exercise) return;
+
+  addLocalItem("tantico_exercises_started", {
+    id: generateLocalId(),
+    slug: exercise.slug || exercise.title || "ejercicio",
+    title: exercise.title || "Ejercicio guiado",
+    category: exercise.category || "apoyo",
+    created_at: new Date().toISOString()
+  });
+
+  updateProgressSummary();
+}
